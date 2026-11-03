@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/auth/supabase_config.dart';
+import 'core/auth/secure_session_storage.dart';
+import 'features/auth/account_screen.dart';
+import 'features/auth/reset_password_screen.dart';
 import 'core/design_system/glass.dart';
 import 'core/motion/tokens.dart';
 import 'data/store.dart';
 import 'features/chat/chat_screen.dart';
 
 final store = LocalStore();
+final recoveryRequired = ValueNotifier<bool>(false);
+String? authStartupError;
 final lightProvider = StateProvider<bool>((ref) => false);
 final reduceProvider = StateProvider<bool>((ref) => false);
 final banglaProvider = StateProvider<bool>((ref) => false);
@@ -13,6 +20,19 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await store.open();
+    try {
+      await Supabase.initialize(
+        url: SupabaseConfig.url,
+        anonKey: SupabaseConfig.publishableKey,
+        debug: false,
+        authOptions: FlutterAuthClientOptions(localStorage: const SecureSessionStorage()),
+      );
+      Supabase.instance.client.auth.onAuthStateChange.listen((state) {
+        if (state.event == AuthChangeEvent.passwordRecovery) recoveryRequired.value = true;
+      }, onError: (Object _) {});
+    } catch (_) {
+      authStartupError = 'Account services could not start. Restart NexChat to retry. Offline demo is available.';
+    }
     final light = await store.setting('light') == 'true';
     final reduced = await store.setting('reduced') == 'true';
     final bangla = await store.setting('bangla') == 'true';
@@ -31,6 +51,12 @@ class NexChat extends ConsumerWidget {
         scaffoldBackgroundColor: light ? const Color(0xFFF0F2FA) : Palette.background,
         colorSchemeSeed: Palette.violet, appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent),
         inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: light ? Colors.white70 : Colors.white.withValues(alpha: .05), border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none))),
+      builder: (context, child) => ValueListenableBuilder<bool>(
+        valueListenable: recoveryRequired,
+        builder: (context, recovery, _) => recovery
+          ? ResetPasswordScreen(onComplete: () => recoveryRequired.value = false)
+          : child!,
+      ),
       home: const Welcome());
   }
 }
@@ -53,30 +79,22 @@ class _WelcomeState extends ConsumerState<Welcome> {
       Expanded(child: PageView.builder(controller: pager, itemCount: 3, onPageChanged: (v) => setState(() => page = v), itemBuilder: (context, i) => Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Hero(tag: 'logo', child: Container(width: 148, height: 148, decoration: BoxDecoration(shape: BoxShape.circle, gradient: const LinearGradient(colors: [Palette.cyan, Palette.violet]), boxShadow: [BoxShadow(color: Palette.violet.withValues(alpha: .25), blurRadius: 64)]), child: Icon([Icons.forum_outlined, Icons.lock_outline, Icons.auto_awesome][i], size: 66, color: Palette.background))),
         const SizedBox(height: 42), Text(titles[i], textAlign: TextAlign.center, style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, height: 1.15)), const SizedBox(height: 20),
-        Text(bn ? 'লিকুইড গ্লাস ডিজাইনে অফলাইন ডেমো। আসল অ্যাকাউন্ট ও মেসেজিং পরের ধাপে।' : 'Beautifully connected. A liquid glass offline sandbox, made for exploring what comes next.', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, height: 1.6)),
+        Text(bn ? 'অ্যাকাউন্টে সাইন ইন করো অথবা অফলাইন চ্যাট ডেমো দেখো। অনলাইন মেসেজিং এখনও চালু হয়নি।' : 'Beautifully connected. A liquid glass offline sandbox, made for exploring what comes next.', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, height: 1.6)),
       ]))),
       Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(3, (i) => AnimatedContainer(duration: MotionTokens.quick, width: page == i ? 28 : 7, height: 7, margin: const EdgeInsets.all(4), decoration: BoxDecoration(color: page == i ? Palette.violet : Colors.grey, borderRadius: BorderRadius.circular(8))))),
       const SizedBox(height: 26), GlassButton(bn ? 'ডেমো শুরু করো' : 'Explore Demo', onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => const Home()))),
-      TextButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AccountScreen())), child: Text(bn ? 'লগইন / সাইন আপ' : 'Sign in / Create account')),
+      TextButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => accountScreen(context))), child: Text(bn ? 'লগইন / সাইন আপ' : 'Sign in / Create account')),
       const Text('PHASE 1 • OFFLINE DEMO', style: TextStyle(fontSize: 10, letterSpacing: 2, color: Palette.cyan)),
     ])))));
   }
 }
-class AccountScreen extends StatefulWidget {
-  const AccountScreen({super.key});
-  @override
-  State<AccountScreen> createState() => _AccountScreenState();
-}
-class _AccountScreenState extends State<AccountScreen> {
-  bool signup = false;
-  @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(signup ? 'Create account' : 'Welcome back')), body: ListView(padding: const EdgeInsets.all(24), children: [
-    GlassCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Icon(Icons.lock_outline, color: Palette.cyan, size: 38), const SizedBox(height: 20), const Text('Account preview', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)), const SizedBox(height: 12), const Text('Real authentication is not enabled in Phase 1. No credentials are collected or saved. Use Demo Mode to explore.'), const SizedBox(height: 24),
-      if (signup) const TextField(enabled: false, decoration: InputDecoration(labelText: 'Display name')),
-      const SizedBox(height: 12), const TextField(enabled: false, decoration: InputDecoration(labelText: 'Email address')), const SizedBox(height: 12), const TextField(enabled: false, obscureText: true, decoration: InputDecoration(labelText: 'Password')),
-      TextButton(onPressed: () => setState(() => signup = !signup), child: Text(signup ? 'Already have an account?' : 'Create an account')),
-      GlassButton('Continue in Demo Mode', onPressed: () => Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute<void>(builder: (_) => const Home()), (_) => false)),
-    ]))]));
+Widget accountScreen(BuildContext context) {
+  if (authStartupError != null) {
+    return Scaffold(appBar: AppBar(title: const Text('Account unavailable')),
+      body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(authStartupError!))));
+  }
+  return AccountScreen(onDemo: () => Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute<void>(builder: (_) => const Home()), (_) => false));
 }
 class Home extends ConsumerStatefulWidget {
   const Home({super.key});
@@ -113,7 +131,8 @@ class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(appBar: AppBar(title: const Text('Settings')), body: ListView(padding: const EdgeInsets.all(20), children: [
+    ListTile(leading: const Icon(Icons.manage_accounts_outlined), title: const Text('My account'), subtitle: const Text('Sign in, verification and sign out'), onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => accountScreen(context)))),
     GlassCard(child: Column(children: [SwitchListTile(title: const Text('Light appearance'), value: ref.watch(lightProvider), onChanged: (v) { ref.read(lightProvider.notifier).state = v; store.set('light', '$v'); }), SwitchListTile(title: const Text('Reduce effects'), subtitle: const Text('Disable glass blur on conversation cards'), value: ref.watch(reduceProvider), onChanged: (v) { ref.read(reduceProvider.notifier).state = v; store.set('reduced', '$v'); }), SwitchListTile(title: const Text('বাংলা'), subtitle: const Text('Welcome and navigation language'), value: ref.watch(banglaProvider), onChanged: (v) { ref.read(banglaProvider.notifier).state = v; store.set('bangla', '$v'); })])),
-    const SizedBox(height: 20), const GlassCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('NexChat 0.1.0', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), SizedBox(height: 12), Text('Phase 1 • Offline demo\n\nNo real accounts, delivery receipts, calls, cloud uploads, or end-to-end encryption are enabled. Do not use this sandbox for sensitive information.\n\nDeveloper: Rakib Chowdhury')]))
+    const SizedBox(height: 20), const GlassCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('NexChat 0.1.0', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)), SizedBox(height: 12), Text('Phase 1 • Offline demo\n\nSupabase email accounts are connected. Online messaging, delivery receipts, calls, cloud uploads and end-to-end encryption are not enabled. Do not use this sandbox for sensitive information.\n\nDeveloper: Rakib Chowdhury')]))
   ]));
 }

@@ -19,8 +19,31 @@ android {
     }
 ''', 1).replace('signingConfigs.getByName("debug")', 'signingConfigs.getByName("release")')
 p.write_text(s)
-p = Path('android/app/src/main/AndroidManifest.xml')
-p.write_text(p.read_text().replace('android:label="nexchat"', 'android:label="NexChat"').replace('<application', '<uses-permission android:name="android.permission.INTERNET"/>\n    <application', 1))
+# Configure authentication callbacks without depending on template whitespace.
+import xml.etree.ElementTree as ET
+android_ns = 'http://schemas.android.com/apk/res/android'
+ET.register_namespace('android', android_ns)
+def attr(name):
+    return '{' + android_ns + '}' + name
+manifest_path = Path('android/app/src/main/AndroidManifest.xml')
+tree = ET.parse(manifest_path)
+root = tree.getroot()
+app = root.find('application')
+assert app is not None
+app.set(attr('label'), 'NexChat')
+app.set(attr('allowBackup'), 'false')
+if not any(e.get(attr('name')) == 'android.permission.INTERNET' for e in root.findall('uses-permission')):
+    ET.SubElement(root, 'uses-permission', {attr('name'): 'android.permission.INTERNET'})
+activity = app.find('activity')
+assert activity is not None
+ET.SubElement(activity, 'meta-data', {attr('name'): 'flutter_deeplinking_enabled', attr('value'): 'false'})
+callback = ET.SubElement(activity, 'intent-filter')
+ET.SubElement(callback, 'action', {attr('name'): 'android.intent.action.VIEW'})
+for category in ['android.intent.category.DEFAULT', 'android.intent.category.BROWSABLE']:
+    ET.SubElement(callback, 'category', {attr('name'): category})
+ET.SubElement(callback, 'data', {attr('scheme'): 'com.nexchat.app', attr('host'): 'auth', attr('path'): '/callback'})
+ET.indent(tree, space='    ')
+tree.write(manifest_path, encoding='unicode')
 
 for activity in Path("android/app/src/main/kotlin").rglob("MainActivity.kt"):
     activity.write_text(activity.read_text().replace("com.nexchat.nexchat", "com.nexchat.app"))

@@ -69,10 +69,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.run_number) }}
-          name: NexChat Phase 1 • Build ${{ github.run_number }}
+          name: NexChat Auth Preview • Build ${{ github.run_number }}
           body: |
-            Offline Demo: glass UI, local text chat, reply, edit, reactions, profile, appearance settings.
-            No real messaging, authentication, calls or E2EE yet.
+            Supabase email signup/login, confirmation, password reset, encrypted session storage; offline demo chats.
+            Online messaging, Google login, calls and E2EE are not enabled.
+            Auth email redirects require com.nexchat.app://auth/callback in the Supabase redirect allowlist.
+            Device authentication and visual verification remain pending.
             Download NexChat-v0.1.0-*.apk for universal installation.
             Without signing secrets this uses a temporary debug certificate; future builds may require uninstalling (deletes local messages).
           files: dist/*
