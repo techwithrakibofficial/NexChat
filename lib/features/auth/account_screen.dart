@@ -32,9 +32,9 @@ class _AccountScreenState extends State<AccountScreen> {
   void initState() {
     super.initState();
     _subscription = _auth.onAuthStateChange.listen((_) {
-      if (mounted) setState(() {});
+      if (mounted) { setState(() {}); }
     }, onError: (Object _) {
-      if (mounted) _message('Session could not refresh. Check your connection.', error: true);
+      if (mounted) { _message('Session could not refresh. Check your connection.', error: true); }
     });
   }
 
@@ -59,11 +59,11 @@ class _AccountScreenState extends State<AccountScreen> {
     try {
       await action();
     } on AuthException catch (e) {
-      if (mounted) _message(e.message, error: true);
+      if (mounted) { _message(e.message, error: true); }
     } catch (_) {
-      if (mounted) _message('Unable to connect. Check your internet and try again.', error: true);
+      if (mounted) { _message('Unable to connect. Check your internet and try again.', error: true); }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) { setState(() => _busy = false); }
     }
   }
 
@@ -94,7 +94,7 @@ class _AccountScreenState extends State<AccountScreen> {
     if (error != null) { _message(error, error: true); return; }
     await _run(() async {
       await _auth.resetPasswordForEmail(_email.text.trim(), redirectTo: SupabaseConfig.callback);
-      if (mounted) _message('If this account exists, a password reset email will arrive. Open its link on this phone.');
+      if (mounted) { _message('If this account exists, a password reset email will arrive. Open its link on this phone.'); }
     });
   }
 
@@ -121,7 +121,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 const SizedBox(height: 20),
                 OutlinedButton(onPressed: _busy ? null : () => _run(() async {
                   await _auth.signOut();
-                  if (mounted) _message('Signed out. Offline demo messages remain on this device.');
+                  if (mounted) { _message('Signed out. Offline demo messages remain on this device.'); }
                 }), child: const Text('Sign out')),
               ] else ...[
                 Text(_signup ? 'Create your space' : 'Welcome back', style: Theme.of(context).textTheme.headlineMedium),
@@ -169,7 +169,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   if (error != null) { _message(error, error: true); return; }
                   _run(() async {
                     await _auth.resend(type: OtpType.signup, email: _email.text.trim(), emailRedirectTo: SupabaseConfig.callback);
-                    if (mounted) _message('Confirmation requested. Check your inbox and spam folder.');
+                    if (mounted) { _message('Confirmation requested. Check your inbox and spam folder.'); }
                   });
                 }, child: const Text('Resend confirmation email')),
               ],

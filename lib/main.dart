@@ -28,7 +28,7 @@ Future<void> main() async {
         authOptions: FlutterAuthClientOptions(localStorage: const SecureSessionStorage()),
       );
       Supabase.instance.client.auth.onAuthStateChange.listen((state) {
-        if (state.event == AuthChangeEvent.passwordRecovery) recoveryRequired.value = true;
+        if (state.event == AuthChangeEvent.passwordRecovery) { recoveryRequired.value = true; }
       }, onError: (Object _) {});
     } catch (_) {
       authStartupError = 'Account services could not start. Restart NexChat to retry. Offline demo is available.';

@@ -26,13 +26,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     try {
       await Supabase.instance.client.auth.updateUser(UserAttributes(password: _password.text));
       _password.clear(); _confirm.clear();
-      if (mounted) widget.onComplete();
+      if (mounted) { widget.onComplete(); }
     } on AuthException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (mounted) { setState(() => _error = e.message); }
     } catch (_) {
-      if (mounted) setState(() => _error = 'Unable to update. Check your connection and try again.');
+      if (mounted) { setState(() => _error = 'Unable to update. Check your connection and try again.'); }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) { setState(() => _busy = false); }
     }
   }
 
