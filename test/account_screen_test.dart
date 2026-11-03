@@ -4,11 +4,14 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:nexchat/features/auth/account_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   var requests = 0;
   setUp(() async {
     requests = 0;
+    SharedPreferences.setMockInitialValues({});
     await Supabase.initialize(
       url: 'https://example.supabase.co', anonKey: 'test-public-key', debug: false,
       httpClient: MockClient((request) async {
@@ -51,9 +54,12 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(MaterialApp(home: AccountScreen(onDemo: () {})));
     await tester.ensureVisible(find.text('New here? Create an account'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('New here? Create an account'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Create account'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextFormField), findsNWidgets(4));
     expect(tester.takeException(), isNull);
   });
 }
