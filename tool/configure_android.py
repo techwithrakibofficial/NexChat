@@ -21,3 +21,6 @@ android {
 p.write_text(s)
 p = Path('android/app/src/main/AndroidManifest.xml')
 p.write_text(p.read_text().replace('android:label="nexchat"', 'android:label="NexChat"').replace('<application', '<uses-permission android:name="android.permission.INTERNET"/>\n    <application', 1))
+
+for activity in Path("android/app/src/main/kotlin").rglob("MainActivity.kt"):
+    activity.write_text(activity.read_text().replace("com.nexchat.nexchat", "com.nexchat.app"))
