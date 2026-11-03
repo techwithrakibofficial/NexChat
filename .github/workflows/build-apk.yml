@@ -1,0 +1,78 @@
+name: Build NexChat APK
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: nexchat-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.8'
+          channel: stable
+          cache: true
+      # Generate native boilerplate using precisely the same pinned SDK.
+      - name: Generate Android runner
+        run: |
+          flutter create --platforms=android --org com.nexchat --project-name nexchat --no-pub /tmp/nexchat_runner
+          cp -R /tmp/nexchat_runner/android ./android
+      - name: Optional persistent release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/release.jks
+            python3 - <<'PY'
+          import os
+          from pathlib import Path
+          def esc(s):
+              return s.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('=', '\\=').replace(':', '\\:')
+          keys = {'storeFile': 'release.jks', 'storePassword': os.environ['KEYSTORE_PASSWORD'], 'keyAlias': os.environ['KEY_ALIAS'], 'keyPassword': os.environ['KEY_PASSWORD']}
+          Path('android/key.properties').write_text(''.join(k + '=' + esc(v) + '\n' for k, v in keys.items()))
+          PY
+          fi
+          python3 tool/configure_android.py
+      - run: flutter pub get
+      - run: dart format lib test
+      - run: flutter analyze
+      - run: flutter test
+      - name: Build universal and ABI APKs
+        run: |
+          flutter build apk --release
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/NexChat-v0.1.0-${GITHUB_RUN_NUMBER}.apk"
+          flutter build apk --release --split-per-abi
+          cp build/app/outputs/flutter-apk/app-*-release.apk dist/
+          cd dist
+          sha256sum *.apk > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NexChat-APKs
+          path: dist/
+      - name: Publish downloadable APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build-{0}', github.run_number) }}
+          name: NexChat Phase 1 • Build ${{ github.run_number }}
+          body: |
+            Offline Demo: glass UI, local text chat, reply, edit, reactions, profile, appearance settings.
+            No real messaging, authentication, calls or E2EE yet.
+            Download NexChat-v0.1.0-*.apk for universal installation.
+            Without signing secrets this uses a temporary debug certificate; future builds may require uninstalling (deletes local messages).
+          files: dist/*
